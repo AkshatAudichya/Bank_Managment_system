@@ -1,0 +1,745 @@
+STATUS=================================
+*----------------------------------------------------------------------*
+***INCLUDE ZT039_BANK_TASK_STATUSO01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Module STATUS OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status OUTPUT.
+  SET PF-STATUS 'STATUS'.
+  SET TITLEBAR 'TITLE'.
+CONSTANTS: cntl_true TYPE i VALUE 1,
+
+cntl_false TYPE i VALUE 0.
+
+DATA:
+
+h_picture TYPE REF TO cl_gui_picture,
+
+h_pic_container TYPE REF TO cl_gui_custom_container.
+
+DATA: graphic_url(255),
+
+graphic_refresh(1),
+
+g_result LIKE cntl_true.
+
+DATA: BEGIN OF graphic_table OCCURS 0,
+
+line(255) TYPE x,
+
+END OF graphic_table.
+
+DATA: graphic_size TYPE i.
+
+**********************************************
+
+
+DATA: l_graphic_xstr TYPE xstring,
+
+l_graphic_conv TYPE i,
+
+l_graphic_offs TYPE i.
+
+CALL METHOD cl_ssf_xsf_utilities=>get_bds_graphic_as_bmp
+
+EXPORTING
+
+p_object = 'GRAPHICS'
+
+p_name = 'DILIGENT' "IMAGE NAME - Image name from SE78
+
+p_id = 'BMAP'
+
+p_btype = 'BCOL' "(BMON = black&white, BCOL = colour)
+
+RECEIVING
+
+p_bmp = l_graphic_xstr
+
+EXCEPTIONS
+
+not_found = 1
+
+OTHERS = 2.
+
+graphic_size = XSTRLEN( l_graphic_xstr ).
+
+CHECK graphic_size > 0.
+
+l_graphic_conv = graphic_size.
+
+l_graphic_offs = 0.
+
+WHILE l_graphic_conv > 255.
+
+graphic_table-line = l_graphic_xstr+l_graphic_offs(255).
+
+APPEND graphic_table.
+
+l_graphic_offs = l_graphic_offs + 255.
+
+l_graphic_conv = l_graphic_conv - 255.
+
+ENDWHILE.
+
+graphic_table-line = l_graphic_xstr+l_graphic_offs(l_graphic_conv).
+
+APPEND graphic_table.
+
+CALL FUNCTION 'DP_CREATE_URL'
+
+EXPORTING
+
+type = 'image' "#EC NOTEXT
+
+subtype = cndp_sap_tab_unknown " 'X-UNKNOWN'
+
+size = graphic_size
+
+lifetime = cndp_lifetime_transaction "'T'
+
+TABLES
+
+data = graphic_table
+
+CHANGING
+
+url = graphic_url
+
+EXCEPTIONS
+
+dp_invalid_parameter = 1
+
+dp_error_put_table = 2
+
+dp_error_general = 3
+
+OTHERS = 4 .
+
+IF sy-subrc <> 0.
+
+MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+
+WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+
+EXIT.
+
+ENDIF.
+
+CREATE OBJECT h_pic_container
+
+EXPORTING container_name = 'ALV_AREA1'.
+
+CREATE OBJECT h_picture EXPORTING parent = h_pic_container.
+
+CALL METHOD h_picture->load_picture_from_url
+
+EXPORTING
+
+url = graphic_url
+
+IMPORTING
+
+RESULT = g_result.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_9002 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_9002 OUTPUT.
+  SET PF-STATUS 'STATUS'.
+* SET TITLEBAR 'xxx'.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_9003 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_9003 OUTPUT.
+  SET PF-STATUS 'STATUS'.
+* SET TITLEBAR 'xxx'.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_9004 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_9004 OUTPUT.
+  SET PF-STATUS 'STATUS'.
+  SELECT * FROM zt039_bank_info INTO TABLE gt_bank_info.
+
+*-----------------------------CREATING FIELDCATLOG-----------------------------
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+*     I_BUFFER_ACTIVE        =
+      i_structure_name       = 'ZT039_BANK_INFO'
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_BYPASSING_BUFFER     =
+*     I_INTERNAL_TABNAME     =
+    CHANGING
+      ct_fieldcat            = lt_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF lo_obj IS INITIAL.
+    CREATE OBJECT lo_obj
+      EXPORTING
+        container_name = 'ALV_AREA'.
+
+    CREATE OBJECT lo_grid
+      EXPORTING
+        i_parent = lo_obj.
+
+    gs_layout-edit = 'X'.
+  ENDIF.
+  LOOP AT lt_fieldcat INTO wa_fieldcat.
+    IF wa_fieldcat-fieldname NE 'CUST_ID' AND wa_fieldcat-fieldname NE 'T_DATE'.
+      wa_fieldcat-edit = 'X'.
+      MODIFY lt_fieldcat FROM wa_fieldcat.
+    ELSE.
+      wa_fieldcat-edit = ' '.
+      MODIFY lt_fieldcat FROM wa_fieldcat.
+    ENDIF.
+  ENDLOOP.
+  CALL METHOD lo_grid->set_table_for_first_display
+    CHANGING
+      it_outtab                     = gt_bank_info
+      it_fieldcatalog               = lt_fieldcat
+    EXCEPTIONS
+      invalid_parameter_combination = 1
+      program_error                 = 2
+      too_many_lines                = 3
+      OTHERS                        = 4.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CALL METHOD lo_grid->register_edit_event
+    EXPORTING
+      i_event_id = cl_gui_alv_grid=>mc_evt_modified.
+  CALL METHOD lo_grid->refresh_table_display.
+  CLEAR GS_BANK.
+  CLEAR GS_BANK_INFO.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_9005 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_9005 OUTPUT.
+  SET PF-STATUS 'STATUS'.
+* SET TITLEBAR 'xxx'.
+  SELECT * FROM zt039_bank_info INTO TABLE gt_bank_info.
+
+*-----------------------------CREATING FIELDCATLOG-----------------------------
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+*     I_BUFFER_ACTIVE        =
+      i_structure_name       = 'ZT039_BANK_INFO'
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_BYPASSING_BUFFER     =
+*     I_INTERNAL_TABNAME     =
+    CHANGING
+      ct_fieldcat            = lt_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF lo_obj IS INITIAL.
+    CREATE OBJECT lo_obj
+      EXPORTING
+        container_name = 'ALV_AREA'.
+
+    CREATE OBJECT lo_grid
+      EXPORTING
+        i_parent = lo_obj.
+
+    gs_layout-edit = 'X'.
+
+  ENDIF.
+    LOOP AT lt_fieldcat INTO wa_fieldcat.
+    IF wa_fieldcat-fieldname NE 'CUST_ID' AND wa_fieldcat-fieldname NE 'T_DATE'.
+      wa_fieldcat-edit = ''.
+      MODIFY lt_fieldcat FROM wa_fieldcat.
+*    ELSE.
+*      wa_fieldcat-edit = 'X'.
+*      MODIFY lt_fieldcat FROM wa_fieldcat.
+    ENDIF.
+  ENDLOOP.
+  CALL METHOD lo_grid->set_table_for_first_display
+    CHANGING
+      it_outtab                     = gt_bank_info
+      it_fieldcatalog               = lt_fieldcat
+    EXCEPTIONS
+      invalid_parameter_combination = 1
+      program_error                 = 2
+      too_many_lines                = 3
+      OTHERS                        = 4.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CALL METHOD lo_grid->register_edit_event
+    EXPORTING
+      i_event_id = cl_gui_alv_grid=>mc_evt_modified.
+  CALL METHOD lo_grid->refresh_table_display.
+
+  IF lo_grid->is_ready_for_input( ) EQ 0.
+    CALL METHOD lo_grid->set_ready_for_input
+      EXPORTING
+        i_ready_for_input = 1.
+  ENDIF.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_9006 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_9006 OUTPUT.
+ SET PF-STATUS 'STATUS'.
+* SET TITLEBAR 'xxx'.
+  SELECT * FROM zt039_bank_info INTO TABLE gt_bank_info.
+
+*-----------------------------CREATING FIELDCATLOG-----------------------------
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+*     I_BUFFER_ACTIVE        =
+      i_structure_name       = 'ZT039_BANK_INFO'
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_BYPASSING_BUFFER     =
+*     I_INTERNAL_TABNAME     =
+    CHANGING
+      ct_fieldcat            = lt_fieldcat
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF lo_obj IS INITIAL.
+    CREATE OBJECT lo_obj
+      EXPORTING
+        container_name = 'ALV_AREA'.
+
+    CREATE OBJECT lo_grid
+      EXPORTING
+        i_parent = lo_obj.
+
+    gs_layout-edit = 'X'.
+
+  ENDIF.
+  CALL METHOD lo_grid->set_table_for_first_display
+    CHANGING
+      it_outtab                     = gt_bank_info
+      it_fieldcatalog               = lt_fieldcat
+    EXCEPTIONS
+      invalid_parameter_combination = 1
+      program_error                 = 2
+      too_many_lines                = 3
+      OTHERS                        = 4.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CALL METHOD lo_grid->register_edit_event
+    EXPORTING
+      i_event_id = cl_gui_alv_grid=>mc_evt_modified.
+  CALL METHOD lo_grid->refresh_table_display.
+ENDMODULE.
+
+USER COMMAND=======================
+*----------------------------------------------------------------------*
+***INCLUDE ZT039_BANK_TASK_USER_COMMANI01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command INPUT.
+  CASE sy-ucomm.
+    WHEN 'FC1'.
+      CALL SCREEN '9002'.
+    WHEN 'FC2'.
+      CALL SCREEN '9003'.
+    WHEN 'FC3'.
+      CALL SCREEN '9004'.
+    WHEN 'FC4'.
+      CALL SCREEN '9005'.
+    WHEN 'FC5'.
+      CALL SCREEN '9006'.
+    WHEN 'BACK'.
+      CALL SCREEN '9001'.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_9002  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_9002 INPUT.
+  CASE sy-ucomm.
+    WHEN 'SAVE'.
+      LOOP AT gt_bank INTO gs_bank1.
+        IF gs_bank-cust_id = gs_bank1-cust_id.
+          MESSAGE: 'ID ALREADY EXISTS' TYPE 'E'.
+        ENDIF.
+      ENDLOOP.
+      INSERT INTO zt039_bank VALUES gs_bank.
+      IF sy-subrc = 0.
+        MESSAGE: 'Account Created Successfully..' TYPE 'S'.
+      ENDIF.
+    WHEN 'FC2'.
+      CALL SCREEN '9003'.
+    WHEN 'FC3'.
+      CALL SCREEN '9004'.
+    WHEN 'FC4'.
+      CALL SCREEN '9005'.
+    WHEN 'FC5'.
+      CALL SCREEN '9006'.
+    WHEN 'BACK'.
+      CALL SCREEN '9001'.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_9003  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_9003 INPUT.
+  SELECT * FROM zt039_bank INTO TABLE gt_bank.
+  READ TABLE gt_bank INTO gs_bank WITH KEY cust_id = gs_bank-cust_id.
+  CASE sy-ucomm.
+    WHEN 'SAVE'.
+      LOOP AT gt_bank_info INTO gs_bank1_info.
+        IF gs_bank_info-cust_id = gs_bank1_info-cust_id.
+          IF gs_bank_info-trans_type = 'C'.
+            gs_bank-cust_balance = gs_bank_info-amount + gs_bank-cust_balance.
+          ELSEIF gs_bank_info-trans_type = 'D'.
+            gs_bank-cust_balance = gs_bank_info-amount - gs_bank-cust_balance.
+          ENDIF.
+        ENDIF.
+        INSERT INTO zt039_bank_info VALUES gs_bank_info.
+        INSERT INTO zt039_bank VALUES gs_bank.
+      ENDLOOP.
+
+    WHEN 'FC1'.
+      CALL SCREEN '9002'.
+    WHEN 'FC3'.
+      CALL SCREEN '9004'.
+    WHEN 'FC4'.
+      CALL SCREEN '9005'.
+    WHEN 'FC5'.
+      CALL SCREEN '9006'.
+    WHEN 'BACK'.
+      CALL SCREEN '9001'.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_9004  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_9004 INPUT.
+  SELECT * FROM zt039_bank INTO TABLE gt_bank.
+  CALL METHOD lo_grid->get_current_cell
+    IMPORTING
+      e_row     = e_row                 " Row on Grid
+      e_value   = e_value            " Value
+      e_col     = e_col     " Column on Grid
+*     es_row_id =                  " Row ID
+      es_col_id = es_col_id            " Column ID
+*     es_row_no =                  " Numeric Row ID
+    .
+  CASE sy-ucomm.
+    WHEN 'SAVE'.
+      READ TABLE gt_bank_info INTO gs_bank_info INDEX e_row.
+      READ TABLE gt_bank INTO gs_bank WITH KEY cust_id = gs_bank_info-cust_id.
+      IF es_col_id-fieldname = 'TRANS_TYPE'.
+        IF e_value = 'C'.
+          gs_bank-cust_balance = gs_bank-cust_balance + gs_bank_info-amount.
+          UPDATE zt039_bank FROM gs_bank.
+          gs_bank_info-trans_type = e_value.
+        ELSEIF e_value = 'D'.
+          gs_bank-cust_balance = gs_bank-cust_balance - gs_bank_info-amount.
+          UPDATE zt039_bank FROM gs_bank.
+          gs_bank_info-trans_type = e_value.
+        ENDIF.
+      ENDIF.
+      IF es_col_id-fieldname = 'AMOUNT'.
+        IF gs_bank_info-trans_type = 'C'.
+          IF e_value > gs_bank_info-amount.
+            gs_bank-cust_balance = gs_bank-cust_balance + ( e_value - gs_bank_info-amount ).
+          ELSEIF e_value < gs_bank_info-amount.
+            gs_bank-cust_balance = gs_bank-cust_balance + ( gs_bank_info-amount - e_value ).
+          ENDIF.
+        ENDIF.
+        IF gs_bank_info-trans_type = 'D'.
+          IF e_value > gs_bank_info-amount.
+            gs_bank-cust_balance = gs_bank-cust_balance - ( e_value - gs_bank_info-amount ).
+          ELSEIF e_value < gs_bank_info-amount.
+            gs_bank-cust_balance = gs_bank-cust_balance - ( gs_bank_info-amount - e_value ).
+          ENDIF.
+        ENDIF.
+      ENDIF.
+      MODIFY gt_bank_info FROM gs_bank_info TRANSPORTING trans_type WHERE cust_id = gs_bank-cust_id.
+      MODIFY gt_bank FROM gs_bank TRANSPORTING cust_balance WHERE cust_id = gs_bank-cust_id.
+      UPDATE zt039_bank FROM TABLE gt_bank.
+    WHEN 'FC1'.
+      CALL SCREEN '9002'.
+    WHEN 'FC2'.
+      CALL SCREEN '9003'.
+    WHEN 'FC4'.
+      CALL SCREEN '9005'.
+    WHEN 'FC5'.
+      CALL SCREEN '9006'.
+    WHEN 'BACK'.
+      CALL SCREEN '9001'.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_9005  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_9005 INPUT.
+  SELECT * FROM zt039_bank INTO TABLE gt_bank.
+  CALL METHOD lo_grid->get_selected_rows
+    IMPORTING
+      et_index_rows = row.          " Indexes of Selected Rows
+
+  CASE sy-ucomm.
+    WHEN 'SAVE'.
+      LOOP AT row INTO rows.
+        READ TABLE gt_bank_info INTO gs_bank_info INDEX rows-index.
+        READ TABLE gt_bank INTO gs_bank WITH KEY cust_id = gs_bank_info-cust_id.
+        IF gs_bank_info-trans_type = 'C'.
+          gs_bank-cust_balance = gs_bank-cust_balance - gs_bank_info-amount.
+        ENDIF.
+        IF gs_bank_info-trans_type = 'D'.
+          gs_bank-cust_balance = gs_bank-cust_balance + gs_bank_info-amount.
+        ENDIF.
+        MODIFY gt_bank FROM gs_bank TRANSPORTING cust_balance WHERE cust_id = gs_bank-cust_id.
+        UPDATE zt039_bank FROM TABLE gt_bank.
+        DELETE FROM zt039_bank_info WHERE cust_id = gs_bank_info-cust_id AND t_date = gs_bank_info-t_date.
+        MESSAGE 'deleted successfully' TYPE 'S'.
+      ENDLOOP.
+    WHEN 'FC1'.
+      CALL SCREEN '9002'.
+    WHEN 'FC3'.
+      CALL SCREEN '9004'.
+    WHEN 'FC2'.
+      CALL SCREEN '9003'.
+    WHEN 'FC5'.
+      CALL SCREEN '9006'.
+    WHEN 'BACK'.
+      CALL SCREEN '9001'.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_9006  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_9006 INPUT.
+  CASE sy-ucomm.
+    WHEN 'FC1'.
+      CALL SCREEN '9002'.
+    WHEN 'FC3'.
+      CALL SCREEN '9004'.
+    WHEN 'FC2'.
+      CALL SCREEN '9003'.
+    WHEN 'FC5'.
+      CALL SCREEN '9006'.
+    WHEN 'FC4'.
+      CALL SCREEN '9005'.
+    WHEN 'BACK'.
+      CALL SCREEN '9001'.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+
+
+F01==============================
+*&---------------------------------------------------------------------*
+*& Include          ZT039_BANK_F01
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*& Form delete
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM delete .
+  SELECT * FROM zt039_bank INTO TABLE gt_bank.
+  CALL METHOD lo_grid->get_selected_rows
+    IMPORTING
+      et_index_rows = row.          " Indexes of Selected Rows
+
+  LOOP AT row INTO rows.
+    READ TABLE gt_bank_info INTO gs_bank_info INDEX rows-index.
+    READ TABLE gt_bank INTO gs_bank WITH KEY cust_id = gs_bank_info-cust_id.
+    IF gs_bank_info-trans_type = 'C'.
+      gs_bank-cust_balance = gs_bank-cust_balance - gs_bank_info-amount.
+    ENDIF.
+    IF gs_bank_info-trans_type = 'D'.
+      gs_bank-cust_balance = gs_bank-cust_balance + gs_bank_info-amount.
+    ENDIF.
+    MODIFY gt_bank FROM gs_bank TRANSPORTING cust_balance WHERE cust_id = gs_bank-cust_id.
+    UPDATE zt039_bank FROM TABLE gt_bank.
+    DELETE FROM zt039_bank_info WHERE cust_id = gs_bank_info-cust_id AND t_date = gs_bank_info-t_date.
+    MESSAGE 'deleted successfully' TYPE 'S'.
+  ENDLOOP.
+
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form ALTER
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM alter .
+  SELECT * FROM zt039_bank INTO TABLE gt_bank.
+  CALL METHOD lo_grid->get_current_cell
+    IMPORTING
+      e_row     = e_row                 " Row on Grid
+      e_value   = e_value            " Value
+      e_col     = e_col     " Column on Grid
+*     es_row_id =                  " Row ID
+      es_col_id = es_col_id            " Column ID
+*     es_row_no =                  " Numeric Row ID
+    .
+  READ TABLE gt_bank_info INTO gs_bank_info INDEX e_row.
+  READ TABLE gt_bank INTO gs_bank WITH KEY cust_id = gs_bank_info-cust_id.
+  IF es_col_id-fieldname = 'TRANS_TYPE'.
+    IF e_value = 'C'.
+      gs_bank-cust_balance = gs_bank-cust_balance + gs_bank_info-amount.
+      UPDATE zt039_bank FROM gs_bank.
+      gs_bank_info-trans_type = e_value.
+    ELSEIF e_value = 'D'.
+      gs_bank-cust_balance = gs_bank-cust_balance - gs_bank_info-amount.
+      UPDATE zt039_bank FROM gs_bank.
+      gs_bank_info-trans_type = e_value.
+    ENDIF.
+  ENDIF.
+  IF es_col_id-fieldname = 'AMOUNT'.
+    IF gs_bank_info-trans_type = 'C'.
+      IF e_value > gs_bank_info-amount.
+        gs_bank-cust_balance = gs_bank-cust_balance + ( e_value - gs_bank_info-amount ).
+      ELSEIF e_value < gs_bank_info-amount.
+        gs_bank-cust_balance = gs_bank-cust_balance + ( gs_bank_info-amount - e_value ).
+      ENDIF.
+    ENDIF.
+    IF gs_bank_info-trans_type = 'D'.
+      IF e_value > gs_bank_info-amount.
+        gs_bank-cust_balance = gs_bank-cust_balance + ( e_value - gs_bank_info-amount ).
+      ELSEIF e_value < gs_bank_info-amount.
+        gs_bank-cust_balance = gs_bank-cust_balance + ( gs_bank_info-amount - e_value ).
+      ENDIF.
+    ENDIF.
+  ENDIF.
+  MODIFY gt_bank_info FROM gs_bank_info TRANSPORTING trans_type WHERE cust_id = gs_bank-cust_id.
+  MODIFY gt_bank FROM gs_bank TRANSPORTING cust_balance WHERE cust_id = gs_bank-cust_id.
+  UPDATE zt039_bank FROM TABLE gt_bank.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form enable
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM enable .
+    IF lo_grid->is_ready_for_input( ) EQ 0.
+      CALL METHOD lo_grid->set_ready_for_input
+        EXPORTING
+          i_ready_for_input = 1.
+      ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form enable1
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM enable1 .
+  LOOP AT lt_fieldcat INTO wa_fieldcat.
+    IF wa_fieldcat-fieldname NE 'CUST_ID' AND wa_fieldcat-fieldname NE 'T_DATE'.
+      wa_fieldcat-edit = 'X'.
+      MODIFY lt_fieldcat FROM wa_fieldcat.
+    ELSE.
+      wa_fieldcat-edit = ' '.
+      MODIFY lt_fieldcat FROM wa_fieldcat.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+
+TOP==========================
+
+*&---------------------------------------------------------------------*
+*& Include ZT039_BANK_TOP                           - Module Pool      ZT039_BANK_TASK
+*&---------------------------------------------------------------------*
+PROGRAM zt039_bank_task.
+
+DATA: gt_bank       TYPE TABLE OF zt039_bank,
+      gs_bank       TYPE zt039_bank,
+      gs_bank1      TYPE zt039_bank,
+      gt_bank_info  TYPE TABLE OF zt039_bank_info,
+      gs_bank_info  TYPE zt039_bank_info,
+      gs_bank1_info TYPE zt039_bank_info,
+      lt_fieldcat   TYPE lvc_t_fcat,
+      wa_fieldcat   TYPE lvc_s_fcat,
+      lo_obj        TYPE REF TO cl_gui_custom_container,
+      lo_grid       TYPE REF TO cl_gui_alv_grid,
+      gs_layout     TYPE lvc_s_layo,
+      flag          TYPE c,
+      test          TYPE c,
+      delete        TYPE c,
+      create_t      TYPE c,
+      create_a      TYPE c,
+      e_row         TYPE i,
+      e_value       TYPE c,
+      e_col         TYPE i,
+      es_col_id     TYPE lvc_s_col,
+      row           TYPE  lvc_t_row,
+      rows          TYPE lvc_s_row,
+      roid          TYPE  lvc_t_roid,
+      bank_class    TYPE REF TO zt039_bank_class,
+      lv_var        TYPE sy-dynnr.
